@@ -12,7 +12,7 @@ export default async function handler(req, res) {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       },
-      body: req.body
+      body: new URLSearchParams(req.body).toString()
     });
 
     const data = await response.json();
