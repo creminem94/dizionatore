@@ -15,7 +15,7 @@
 </head>
 <body>
   <h1>Dizionatore</h1>
-  <p>Inserisci una parola per ottenere la sua definizione.</p>
+  <p>Inserisci una parola o una frase per ottenere la sua dizione</p>
   <input type="text" id="testo" placeholder="Scrivi una parola">
   <button onclick="diziona()">Analizza</button>
   <div id="output"></div>
@@ -41,10 +41,17 @@
       const result = await response.json();
       const parole = result.parole;
       let html = "";
-
+      console.log(parole)
       if (parole && Object.keys(parole).length > 0) {
         for (let [parola, descrizione] of Object.entries(parole)) {
-          html += `<strong>${parola}</strong>: ${descrizione}<br><br>`;
+          html += `<strong>${parola}</strong>: `;
+          const tokens = descrizione.split('|');
+          if (tokens[0] == '') {
+            html += tokens[1].trim();
+          } else {
+            html += tokens[3].trim()
+          }
+          html += "<br>";
         }
       } else {
         html = "<p>Nessun risultato</p>";
@@ -52,6 +59,13 @@
 
       document.getElementById('output').innerHTML = html;
     }
+
+    // Permetti invio con Enter
+    document.getElementById('testo').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        diziona();
+      }
+    });
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js');
