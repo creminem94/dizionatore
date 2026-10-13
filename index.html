@@ -2,27 +2,366 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Dizionatore PWA</title>
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#ffffff">
+  <link rel="icon" href="icon.png">
+  <meta name="theme-color" content="#f5f6fa" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#12141c" media="(prefers-color-scheme: dark)">
   <style>
-    body { font-family: sans-serif; padding: 1rem; background: #f9f9f9; }
-    input, button { padding: 0.5rem; font-size: 1rem; width: 100%; margin-bottom: 1rem; }
-    button { background: #007bff; color: white; border: none; }
-    #output { background: white; padding: 1rem; border: 1px solid #ccc; white-space: pre-wrap; }
+    :root {
+      --bg: #f5f6fa;
+      --card: #ffffff;
+      --text: #1b1e28;
+      --muted: #6b7183;
+      --border: #e3e6ee;
+      --accent: #3d5afe;
+      --accent-text: #ffffff;
+      --accent-soft: #eaedff;
+      --warn: #b45309;
+      --warn-soft: #fef3c7;
+      --error: #b3261e;
+      --error-soft: #fde8e6;
+      --shadow: 0 1px 2px rgba(20, 24, 40, .05), 0 8px 24px rgba(20, 24, 40, .06);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #12141c;
+        --card: #1b1e29;
+        --text: #eceef5;
+        --muted: #9299ad;
+        --border: #2b2f3d;
+        --accent: #7c8dff;
+        --accent-text: #0e1020;
+        --accent-soft: #262b4a;
+        --warn: #fbbf24;
+        --warn-soft: #3a2f12;
+        --error: #ff8a80;
+        --error-soft: #3a1c1a;
+        --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+      -webkit-text-size-adjust: 100%;
+    }
+    main {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: calc(1.75rem + env(safe-area-inset-top)) 16px calc(2rem + env(safe-area-inset-bottom));
+    }
+
+    header { margin-bottom: 1.25rem; }
+    h1 { margin: 0; font-size: 1.75rem; letter-spacing: -.02em; }
+    header p { margin: .25rem 0 0; color: var(--muted); font-size: .95rem; }
+
+    .search {
+      display: flex;
+      gap: 8px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 6px;
+      box-shadow: var(--shadow);
+    }
+    .search:focus-within { border-color: var(--accent); }
+    .search input {
+      flex: 1;
+      min-width: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-size: 1.05rem;
+      padding: .6rem .75rem;
+      outline: none;
+    }
+    .search input::placeholder { color: var(--muted); }
+    .search button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-width: 108px;
+      border: 0;
+      border-radius: 11px;
+      padding: .6rem 1rem;
+      font: inherit;
+      font-weight: 600;
+      background: var(--accent);
+      color: var(--accent-text);
+      cursor: pointer;
+    }
+    .search button:disabled { opacity: .75; cursor: progress; }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .card {
+      margin-top: 1rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .card:empty { display: none; }
+
+    .row { padding: .8rem 1rem; }
+    .row + .row { border-top: 1px solid var(--border); }
+    .row .parola { color: var(--muted); font-size: .85rem; }
+    .row .dizione { font-size: 1.3rem; font-weight: 600; letter-spacing: .01em; }
+    .row .ipa { margin-left: .5rem; color: var(--muted); font-size: .9rem; font-weight: 400; }
+    .row .nota { margin-top: .15rem; }
+    .tag {
+      display: inline-block;
+      margin-left: .4rem;
+      padding: 0 .45rem;
+      border-radius: 999px;
+      background: var(--warn-soft);
+      color: var(--warn);
+      font-size: .72rem;
+      font-weight: 600;
+      vertical-align: middle;
+    }
+
+    .message { padding: 1rem; color: var(--muted); text-align: center; }
+    .message.error { background: var(--error-soft); color: var(--error); }
+
+    .skeleton { padding: .8rem 1rem; }
+    .skeleton + .skeleton { border-top: 1px solid var(--border); }
+    .skeleton span {
+      display: block;
+      height: .8rem;
+      border-radius: 6px;
+      background: linear-gradient(90deg, var(--border) 25%, var(--bg) 50%, var(--border) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.2s linear infinite;
+    }
+    .skeleton span:first-child { width: 22%; margin-bottom: .55rem; }
+    .skeleton span:last-child { width: 48%; height: 1.2rem; }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+
+    #cronologia { margin-top: 2rem; }
+    #cronologia[hidden] { display: none; }
+    .crono-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: .6rem;
+    }
+    .crono-head h2 { margin: 0; font-size: 1rem; }
+    .tabs {
+      display: flex;
+      padding: 3px;
+      border-radius: 10px;
+      background: var(--border);
+    }
+    .tabs button {
+      border: 0;
+      border-radius: 8px;
+      padding: .3rem .7rem;
+      font: inherit;
+      font-size: .85rem;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .tabs button[aria-pressed="true"] { background: var(--card); color: var(--text); font-weight: 600; }
+
+    #lista { list-style: none; margin: 0; padding: 0; }
+    #lista li { display: flex; align-items: center; }
+    #lista li + li { border-top: 1px solid var(--border); }
+    .voce {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      padding: .7rem 0 .7rem 1rem;
+      cursor: pointer;
+    }
+    .voce .testo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .voce .quando { color: var(--muted); font-size: .8rem; white-space: nowrap; }
+    .voce .conta {
+      min-width: 2rem;
+      padding: .05rem .45rem;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: .78rem;
+      font-weight: 600;
+      text-align: center;
+    }
+    .rimuovi {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 1.2rem;
+      line-height: 1;
+      padding: .7rem .9rem;
+      cursor: pointer;
+    }
+    .svuota {
+      display: block;
+      margin: .6rem auto 0;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-size: .85rem;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    button:focus-visible, .search input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .search input:focus-visible { outline: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .spinner, .skeleton span { animation-duration: 3s; }
+    }
   </style>
 </head>
 <body>
-  <h1>Dizionatore</h1>
-  <p>Inserisci una parola o una frase per ottenere la sua dizione</p>
-  <input type="text" id="testo" placeholder="Scrivi una parola">
-  <button onclick="diziona()">Analizza</button>
-  <div id="output"></div>
+  <main>
+    <header>
+      <h1>Dizionatore</h1>
+      <p>Inserisci una parola o una frase per ottenere la sua dizione</p>
+    </header>
+
+    <form class="search" id="form" role="search">
+      <input type="text" id="testo" placeholder="Scrivi una parola" aria-label="Parola o frase"
+             autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search">
+      <button type="submit" id="invia">Analizza</button>
+    </form>
+
+    <div class="card" id="output" aria-live="polite"></div>
+
+    <section id="cronologia" hidden>
+      <div class="crono-head">
+        <h2>Ricerche</h2>
+        <div class="tabs">
+          <button type="button" data-ordine="frequenti">Più cercate</button>
+          <button type="button" data-ordine="recenti">Recenti</button>
+        </div>
+      </div>
+      <div class="card"><ul id="lista"></ul></div>
+      <button type="button" class="svuota" id="svuota">Cancella cronologia</button>
+    </section>
+  </main>
 
   <script>
-    async function diziona() {
-      const testo = document.getElementById('testo').value;
+    const CHIAVE_CRONOLOGIA = 'dizionatore-cronologia';
+    const CHIAVE_ORDINE = 'dizionatore-ordine';
+    const MAX_CRONOLOGIA = 50;
+
+    const form = document.getElementById('form');
+    const input = document.getElementById('testo');
+    const invia = document.getElementById('invia');
+    const output = document.getElementById('output');
+    const cronologia = document.getElementById('cronologia');
+    const lista = document.getElementById('lista');
+
+    let richiestaCorrente = 0;
+    let ordine = leggi(CHIAVE_ORDINE, 'frequenti');
+
+    function leggi(chiave, predefinito) {
+      try {
+        const valore = JSON.parse(localStorage.getItem(chiave));
+        return valore ?? predefinito;
+      } catch {
+        return predefinito;
+      }
+    }
+
+    function scrivi(chiave, valore) {
+      try {
+        localStorage.setItem(chiave, JSON.stringify(valore));
+      } catch {
+        // localStorage non disponibile (es. navigazione privata): la cronologia non viene salvata
+      }
+    }
+
+    function el(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text != null) node.textContent = text;
+      return node;
+    }
+
+    function impostaCaricamento(attivo) {
+      invia.disabled = attivo;
+      output.setAttribute('aria-busy', attivo);
+      if (attivo) {
+        invia.replaceChildren(el('span', 'spinner'), 'Analizzo…');
+      } else {
+        invia.textContent = 'Analizza';
+      }
+    }
+
+    function mostraScheletro(testo) {
+      const righe = Math.min(testo.split(/\s+/).length, 4);
+      output.replaceChildren();
+      for (let i = 0; i < righe; i++) {
+        const riga = el('div', 'skeleton');
+        riga.append(el('span'), el('span'));
+        output.append(riga);
+      }
+    }
+
+    function mostraMessaggio(testo, errore) {
+      output.replaceChildren(el('div', errore ? 'message error' : 'message', testo));
+    }
+
+    function mostraRisultati(parole) {
+      output.replaceChildren();
+      for (const [parola, descrizione] of Object.entries(parole)) {
+        // formato: "flag|dizione|afi|nota", con flag valorizzato per le parole ambigue
+        const tokens = String(descrizione).split('|');
+        const riga = el('div', 'row');
+        const etichetta = el('div', 'parola', parola);
+
+        if (tokens[0] === '') {
+          const dizione = el('div', 'dizione', (tokens[1] || parola).trim());
+          if (tokens[2]) dizione.append(el('span', 'ipa', `/${tokens[2].trim()}/`));
+          riga.append(etichetta, dizione);
+        } else {
+          etichetta.append(el('span', 'tag', 'ambigua'));
+          riga.append(etichetta, el('div', 'nota', (tokens[3] || tokens[1] || parola).trim()));
+        }
+        output.append(riga);
+      }
+    }
+
+    async function diziona(testo) {
+      testo = testo.trim();
+      if (!testo) {
+        input.focus();
+        return;
+      }
+
+      const richiesta = ++richiestaCorrente;
+      impostaCaricamento(true);
+      mostraScheletro(testo);
+
       const body = new URLSearchParams({
         testo,
         editor: "html",
@@ -32,40 +371,126 @@
         "mangia-parole": "false"
       });
 
-      const response = await fetch('/api/proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body
-      });
+      try {
+        const response = await fetch('/api/proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const result = await response.json();
+        if (richiesta !== richiestaCorrente) return;
 
-      const result = await response.json();
-      const parole = result.parole;
-      let html = "";
-      console.log(parole)
-      if (parole && Object.keys(parole).length > 0) {
-        for (let [parola, descrizione] of Object.entries(parole)) {
-          html += `<strong>${parola}</strong>: `;
-          const tokens = descrizione.split('|');
-          if (tokens[0] == '') {
-            html += tokens[1].trim();
-          } else {
-            html += tokens[3].trim()
-          }
-          html += "<br>";
+        const parole = result.parole;
+        if (parole && Object.keys(parole).length > 0) {
+          mostraRisultati(parole);
+          registraRicerca(testo);
+        } else {
+          mostraMessaggio('Nessun risultato');
         }
-      } else {
-        html = "<p>Nessun risultato</p>";
+      } catch (error) {
+        if (richiesta !== richiestaCorrente) return;
+        console.error(error);
+        mostraMessaggio(navigator.onLine
+          ? 'Qualcosa è andato storto. Riprova tra poco.'
+          : 'Sei offline. Controlla la connessione e riprova.', true);
+      } finally {
+        if (richiesta === richiestaCorrente) impostaCaricamento(false);
       }
-
-      document.getElementById('output').innerHTML = html;
     }
 
-    // Permetti invio con Enter
-    document.getElementById('testo').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') {
-        diziona();
+    function registraRicerca(testo) {
+      const voci = leggi(CHIAVE_CRONOLOGIA, []);
+      const chiave = testo.toLowerCase();
+      const esistente = voci.find(v => v.testo.toLowerCase() === chiave);
+      if (esistente) {
+        esistente.conta++;
+        esistente.ultima = Date.now();
+      } else {
+        voci.push({ testo, conta: 1, ultima: Date.now() });
+      }
+      // oltre il limite si scartano le ricerche più vecchie
+      voci.sort((a, b) => b.ultima - a.ultima);
+      scrivi(CHIAVE_CRONOLOGIA, voci.slice(0, MAX_CRONOLOGIA));
+      disegnaCronologia();
+    }
+
+    function tempoFa(timestamp) {
+      const minuti = Math.floor((Date.now() - timestamp) / 60000);
+      if (minuti < 1) return 'adesso';
+      if (minuti < 60) return `${minuti} min fa`;
+      const ore = Math.floor(minuti / 60);
+      if (ore < 24) return `${ore} h fa`;
+      const giorni = Math.floor(ore / 24);
+      if (giorni === 1) return 'ieri';
+      if (giorni < 7) return `${giorni} giorni fa`;
+      return new Date(timestamp).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+    }
+
+    function disegnaCronologia() {
+      const voci = leggi(CHIAVE_CRONOLOGIA, []);
+      cronologia.hidden = voci.length === 0;
+
+      for (const tab of cronologia.querySelectorAll('[data-ordine]')) {
+        tab.setAttribute('aria-pressed', tab.dataset.ordine === ordine);
+      }
+
+      if (ordine === 'frequenti') {
+        voci.sort((a, b) => b.conta - a.conta || b.ultima - a.ultima);
+      } else {
+        voci.sort((a, b) => b.ultima - a.ultima);
+      }
+
+      lista.replaceChildren();
+      for (const voce of voci) {
+        const li = el('li');
+        const apri = el('button', 'voce');
+        apri.type = 'button';
+        apri.append(
+          el('span', 'testo', voce.testo),
+          el('span', 'quando', tempoFa(voce.ultima)),
+          el('span', 'conta', `×${voce.conta}`)
+        );
+        apri.addEventListener('click', () => {
+          input.value = voce.testo;
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          diziona(voce.testo);
+        });
+
+        const rimuovi = el('button', 'rimuovi', '×');
+        rimuovi.type = 'button';
+        rimuovi.setAttribute('aria-label', `Rimuovi "${voce.testo}" dalla cronologia`);
+        rimuovi.addEventListener('click', () => {
+          scrivi(CHIAVE_CRONOLOGIA, leggi(CHIAVE_CRONOLOGIA, []).filter(v => v.testo !== voce.testo));
+          disegnaCronologia();
+        });
+
+        li.append(apri, rimuovi);
+        lista.append(li);
+      }
+    }
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      diziona(input.value);
+    });
+
+    for (const tab of cronologia.querySelectorAll('[data-ordine]')) {
+      tab.addEventListener('click', () => {
+        ordine = tab.dataset.ordine;
+        scrivi(CHIAVE_ORDINE, ordine);
+        disegnaCronologia();
+      });
+    }
+
+    document.getElementById('svuota').addEventListener('click', () => {
+      if (confirm('Cancellare tutta la cronologia delle ricerche?')) {
+        scrivi(CHIAVE_CRONOLOGIA, []);
+        disegnaCronologia();
       }
     });
+
+    disegnaCronologia();
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js');
