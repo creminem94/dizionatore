@@ -200,7 +200,7 @@
       padding: .7rem 0 .7rem 1rem;
       cursor: pointer;
     }
-    .voce .testo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .voce .testo { flex: 1; min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
     .voce .quando { color: var(--muted); font-size: .8rem; white-space: nowrap; }
     .voce .conta {
       min-width: 2rem;
@@ -384,7 +384,7 @@
         const parole = result.parole;
         if (parole && Object.keys(parole).length > 0) {
           mostraRisultati(parole);
-          registraRicerca(testo);
+          registraRicerca(parole);
         } else {
           mostraMessaggio('Nessun risultato');
         }
@@ -399,15 +399,22 @@
       }
     }
 
-    function registraRicerca(testo) {
-      const voci = leggi(CHIAVE_CRONOLOGIA, []);
-      const chiave = testo.toLowerCase();
-      const esistente = voci.find(v => v.testo.toLowerCase() === chiave);
-      if (esistente) {
-        esistente.conta++;
-        esistente.ultima = Date.now();
-      } else {
-        voci.push({ testo, conta: 1, ultima: Date.now() });
+    function registraRicerca(parole) {
+      // in cronologia finiscono le singole parole, non la frase cercata
+      const voci = leggi(CHIAVE_CRONOLOGIA, []).filter(v => !/\s/.test(v.testo));
+      const adesso = Date.now();
+      for (const [parola, descrizione] of Object.entries(parole)) {
+        const tokens = String(descrizione).split('|');
+        const dizione = ((tokens[0] === '' ? tokens[1] : tokens[3] || tokens[1]) || parola).trim();
+        const chiave = parola.toLowerCase();
+        const esistente = voci.find(v => v.testo.toLowerCase() === chiave);
+        if (esistente) {
+          esistente.conta++;
+          esistente.ultima = adesso;
+          esistente.dizione = dizione;
+        } else {
+          voci.push({ testo: parola, dizione, conta: 1, ultima: adesso });
+        }
       }
       // oltre il limite si scartano le ricerche più vecchie
       voci.sort((a, b) => b.ultima - a.ultima);
@@ -447,7 +454,7 @@
         const apri = el('button', 'voce');
         apri.type = 'button';
         apri.append(
-          el('span', 'testo', voce.testo),
+          el('span', 'testo', voce.dizione || voce.testo),
           el('span', 'quando', tempoFa(voce.ultima)),
           el('span', 'conta', `×${voce.conta}`)
         );
